@@ -11,6 +11,14 @@ Faithful Companion will be an AI-powered voice and text assistant designed to su
 - **Offline Support** (Basic AI capabilities without internet access)
 - **Privacy-First Design** (No data collection without user consent)
 - **Multi-Platform Accessibility** (Android first, later Web & iOS)
+- **Voice Output (Text-to-Speech)** (Chatbot can speak responses through headphones or speakers)
+- **Real-Time Chatbot Interaction** (Text & Voice)
+- **Biblically-Grounded Responses** (AI trained with Scripture-based context)
+- **Active Language Translation** (Enables users to communicate with others in different languages)
+- **Prayer & Devotion Mode** (Guided prayers, daily devotionals, and scripture suggestions)
+- **Offline Support** (Basic AI capabilities without internet access)
+- **Privacy-First Design** (No data collection without user consent)
+- **Multi-Platform Accessibility** (Android first, later Web & iOS)
 
 ### **Advanced Features (Future Goals)**
 - **Personalized Faith Journey Tracking**
