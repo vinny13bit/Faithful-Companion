@@ -53,19 +53,19 @@
     <div id="chat-container">
         <div id="chat-box"></div>
         <input type="text" id="input-box" placeholder="Type a message...">
-        <button onclick="sendMessage()">Send</button>
+        <button onclick="handleUserInput()">Send</button>
+        <button onclick="startSpeechRecognition()">🎤 Speak</button>
+        <button onclick="toggleVoice()">🔊 Mute/Unmute</button>
     </div>
 
     <script>
-        async function sendMessage() {
-            let inputBox = document.getElementById("input-box");
-            let message = inputBox.value.trim();
-            if (!message) return;
+        let voiceEnabled = true;  // Mute/unmute toggle
+
+        async function sendMessage(text) {
+            let chatBox = document.getElementById("chat-box");
 
             // Display user message
-            let chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML += `<div class="message user">${message}</div>`;
-            inputBox.value = "";
+            chatBox.innerHTML += `<div class="message user">${text}</div>`;
             chatBox.scrollTop = chatBox.scrollHeight;
 
             // Send to FastAPI
@@ -73,16 +73,68 @@
                 let response = await fetch("http://127.0.0.1:8000/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt: message })
+                    body: JSON.stringify({ prompt: text })
                 });
                 let data = await response.json();
 
                 // Display AI response
-                chatBox.innerHTML += `<div class="message ai">${data.response}</div>`;
+                let aiMessage = data.response;
+                chatBox.innerHTML += `<div class="message ai">${aiMessage}</div>`;
                 chatBox.scrollTop = chatBox.scrollHeight;
+
+                // 🎙️ Speak the AI response (if not muted)
+                if (voiceEnabled) {
+                    speakText(aiMessage);
+                }
             } catch (error) {
                 console.error("Error:", error);
             }
+        }
+
+        function handleUserInput() {
+            let inputBox = document.getElementById("input-box");
+            let message = inputBox.value.trim();
+            if (message) {
+                sendMessage(message);
+                inputBox.value = "";
+            }
+        }
+
+        // 🎤 Voice Input (Speech-to-Text)
+        function startSpeechRecognition() {
+            let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+
+            recognition.onstart = function () {
+                console.log("Voice recognition started...");
+            };
+
+            recognition.onresult = function (event) {
+                let transcript = event.results[0][0].transcript;
+                console.log("Recognized:", transcript);
+                sendMessage(transcript);
+            };
+
+            recognition.onerror = function (event) {
+                console.error("Speech recognition error:", event.error);
+            };
+
+            recognition.start();
+        }
+
+        // 🔊 Text-to-Speech (AI Speaks)
+        function speakText(text) {
+            let speech = new SpeechSynthesisUtterance(text);
+            speech.lang = "en-US";
+            speech.rate = 1; // Adjust speed (1 = normal)
+            speech.pitch = 1; // Adjust pitch (1 = normal)
+            window.speechSynthesis.speak(speech);
+        }
+
+        // 🎚️ Toggle Voice Output (Mute/Unmute)
+        function toggleVoice() {
+            voiceEnabled = !voiceEnabled;
+            console.log(voiceEnabled ? "Voice enabled" : "Voice muted");
         }
     </script>
 </body>
