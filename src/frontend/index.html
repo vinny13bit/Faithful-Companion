@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faithful Companion</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
+        }
+        #chat-container {
+            width: 400px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        #chat-box {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #fff;
+        }
+        .message {
+            text-align: left;
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 5px;
+            max-width: 75%;
+        }
+        .user { background-color: #d1e7ff; align-self: flex-end; }
+        .ai { background-color: #e6e6e6; align-self: flex-start; }
+        #input-box {
+            width: 80%;
+            padding: 10px;
+        }
+        button {
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Faithful Companion Chat</h1>
+    <div id="chat-container">
+        <div id="chat-box"></div>
+        <input type="text" id="input-box" placeholder="Type a message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            let inputBox = document.getElementById("input-box");
+            let message = inputBox.value.trim();
+            if (!message) return;
+
+            // Display user message
+            let chatBox = document.getElementById("chat-box");
+            chatBox.innerHTML += `<div class="message user">${message}</div>`;
+            inputBox.value = "";
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Send to FastAPI
+            try {
+                let response = await fetch("http://127.0.0.1:8000/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prompt: message })
+                });
+                let data = await response.json();
+
+                // Display AI response
+                chatBox.innerHTML += `<div class="message ai">${data.response}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        }
+    </script>
+</body>
+</html>
