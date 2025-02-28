@@ -4,6 +4,7 @@
 Faithful Companion is an open-source, faith-driven AI assistant designed to provide real-time text and voice interaction, offering biblical wisdom, spiritual encouragement, and practical guidance for daily life. Rooted in the truth of God’s Word, Faithful Companion seeks to assist users in their walk with Christ by fostering meaningful conversations, answering faith-related questions, and serving as a digital tool for reflection, prayer, and learning. This project is built with a commitment to privacy, ethical AI, and a Christ-centered approach to technology.
 
 ### **Key Features**
+- **Active Translation Capabilities**: Supports real-time translation of foreign languages for users.
 - **Biblically Grounded Responses**: Answers aligned with Scripture and Christian teachings.
 - **Multi-Platform Support**: Available on Android, web, and future expansions.
 - **Real-Time Voice & Text Interaction**: Engage in meaningful discussions about faith and daily challenges.
@@ -56,6 +57,7 @@ To get started with Faithful Companion, follow these steps:
 - The system will operate independently from major tech companies' surveillance and tracking mechanisms.
 
 #### **5. Faith-Based Response System**
+- Supports **real-time translation** of biblical responses to assist users in different languages.
 - Every interaction will be designed to **encourage spiritual growth** and align with biblical principles.
 - The assistant will provide:
   - Scripture-based answers
@@ -74,4 +76,6 @@ To get started with Faithful Companion, follow these steps:
 - Begin development of a basic prototype for text-based and voice interaction.
 
 **"Whatever you do, work heartily, as for the Lord and not for men." – Colossians 3:23**
+
+
 
