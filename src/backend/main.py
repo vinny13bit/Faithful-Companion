@@ -3,6 +3,7 @@ import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -26,6 +27,7 @@ if not OPENAI_API_KEY:
 
 # Chat history file
 CHAT_HISTORY_FILE = "chat_history.json"
+MESSAGE_LIMIT = 50  # Store only the last 50 messages
 
 def load_chat_history():
     """Load chat history from file."""
@@ -35,7 +37,8 @@ def load_chat_history():
     return []
 
 def save_chat_history(history):
-    """Save chat history to file."""
+    """Save chat history to file, keeping only the last MESSAGE_LIMIT messages."""
+    history = history[-MESSAGE_LIMIT:]  # Keep only the last MESSAGE_LIMIT messages
     with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as file:
         json.dump(history, file, indent=4)
 
@@ -60,11 +63,22 @@ async def chat_with_ai(user_input: dict):
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt is required")
 
-    response = {"user": prompt, "ai": f"Mock response for: {prompt}"}
+    response = {
+        "user": prompt,
+        "ai": f"Mock response for: {prompt}",
+        "timestamp": datetime.utcnow().isoformat()  # Add timestamp
+    }
     history = load_chat_history()
     history.append(response)
     save_chat_history(history)
     
     return {"response": response["ai"]}
+
+@app.delete("/clear-chat-history")
+def clear_chat_history():
+    """Clear chat history file."""
+    with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as file:
+        json.dump([], file, indent=4)
+    return {"message": "Chat history cleared."}
 
 # Run server using: uvicorn main:app --reload
