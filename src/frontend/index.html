@@ -3,151 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Faithful Companion</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            text-align: center;
-            padding: 20px;
+    <title>Faithful Companion Chat</title>
+    <script>
+        let currentConversationId = null;
+        let username = "John"; // Temporary username for testing
+
+        async function startConversation() {
+            const response = await fetch(`http://127.0.0.1:8000/start-conversation/${username}`, {
+                method: "POST"
+            });
+            const data = await response.json();
+            currentConversationId = data.conversation_id;
+            document.getElementById("conversationId").innerText = `Conversation ID: ${currentConversationId}`;
+            loadConversations();
         }
-        #login-container, #chat-container {
-            width: 400px;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+
+        async function sendMessage() {
+            const messageInput = document.getElementById("messageInput");
+            const message = messageInput.value;
+            if (!message || !currentConversationId) return;
+
+            const response = await fetch(`http://127.0.0.1:8000/chat/${currentConversationId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: message })
+            });
+            const data = await response.json();
+            displayMessage("You", message);
+            displayMessage("AI", data.response);
+            speakMessage(data.response);
+            messageInput.value = "";
         }
-        #chat-container { display: none; }
-        #chat-box {
-            height: 300px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            background: #fff;
+
+        function displayMessage(sender, message) {
+            const chatBox = document.getElementById("chatBox");
+            const messageElement = document.createElement("p");
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            chatBox.appendChild(messageElement);
         }
-        .message {
-            text-align: left;
-            margin: 10px 0;
-            padding: 8px;
-            border-radius: 5px;
-            max-width: 75%;
+
+        function speakMessage(message) {
+            const utterance = new SpeechSynthesisUtterance(message);
+            speechSynthesis.speak(utterance);
         }
-        .user { background-color: #d1e7ff; align-self: flex-end; }
-        .ai { background-color: #e6e6e6; align-self: flex-start; }
-        #input-box, #username, #password {
-            width: 80%;
-            padding: 10px;
-            margin: 5px 0;
+
+        async function loadConversations() {
+            const response = await fetch(`http://127.0.0.1:8000/chat-history/${currentConversationId}`);
+            const data = await response.json();
+            const chatBox = document.getElementById("chatBox");
+            chatBox.innerHTML = "";
+            data.history.forEach(entry => {
+                displayMessage("You", entry.user);
+                displayMessage("AI", entry.ai);
+            });
         }
-        button {
-            padding: 10px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-    </style>
+    </script>
 </head>
 <body>
     <h1>Faithful Companion Chat</h1>
-    
-    <div id="login-container">
-        <h2>Login</h2>
-        <input type="text" id="username" placeholder="Enter Username">
-        <input type="password" id="password" placeholder="Enter Password">
-        <button onclick="login()">Login</button>
-    </div>
-    
-    <div id="chat-container">
-        <h2>Welcome, <span id="user-display"></span>!</h2>
-        <div id="chat-box"></div>
-        <input type="text" id="input-box" placeholder="Type a message...">
-        <button onclick="handleUserInput()">Send</button>
-        <button onclick="startSpeechRecognition()">🎤 Speak</button>
-        <button onclick="toggleVoice()">🔊 Mute/Unmute</button>
-    </div>
-
-    <script>
-        let voiceEnabled = true;
-        let currentUser = "";
-
-        async function login() {
-            let username = document.getElementById("username").value.trim();
-            let password = document.getElementById("password").value.trim();
-            
-            if (!username || !password) {
-                alert("Please enter both username and password.");
-                return;
-            }
-            
-            let response = await fetch("http://127.0.0.1:8000/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, password })
-            });
-            
-            let data = await response.json();
-            if (response.ok) {
-                currentUser = username;
-                document.getElementById("user-display").innerText = username;
-                document.getElementById("login-container").style.display = "none";
-                document.getElementById("chat-container").style.display = "block";
-            } else {
-                alert(data.detail);
-            }
-        }
-
-        async function sendMessage(text) {
-            let chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML += `<div class="message user">${text}</div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
-            
-            let response = await fetch(`http://127.0.0.1:8000/chat/${currentUser}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: text })
-            });
-            
-            let data = await response.json();
-            let aiMessage = data.response;
-            chatBox.innerHTML += `<div class="message ai">${aiMessage}</div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
-            
-            if (voiceEnabled) {
-                speakText(aiMessage);
-            }
-        }
-
-        function handleUserInput() {
-            let inputBox = document.getElementById("input-box");
-            let message = inputBox.value.trim();
-            if (message) {
-                sendMessage(message);
-                inputBox.value = "";
-            }
-        }
-
-        function startSpeechRecognition() {
-            let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = "en-US";
-            recognition.onresult = function (event) {
-                let transcript = event.results[0][0].transcript;
-                sendMessage(transcript);
-            };
-            recognition.start();
-        }
-
-        function speakText(text) {
-            let speech = new SpeechSynthesisUtterance(text);
-            speech.lang = "en-US";
-            window.speechSynthesis.speak(speech);
-        }
-
-        function toggleVoice() {
-            voiceEnabled = !voiceEnabled;
-        }
-    </script>
+    <button onclick="startConversation()">Start New Conversation</button>
+    <p id="conversationId">No conversation started.</p>
+    <div id="chatBox" style="border:1px solid black; padding:10px; width:50%; height:300px; overflow:auto;"></div>
+    <input type="text" id="messageInput" placeholder="Type your message...">
+    <button onclick="sendMessage()">Send</button>
 </body>
 </html>
