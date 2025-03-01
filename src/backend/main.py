@@ -42,13 +42,21 @@ def init_db():
         )
     ''')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_history (
+        CREATE TABLE IF NOT EXISTS conversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(username) REFERENCES users(username)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER NOT NULL,
             user_message TEXT NOT NULL,
             ai_response TEXT NOT NULL,
             timestamp TEXT NOT NULL,
-            FOREIGN KEY(username) REFERENCES users(username)
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id)
         )
     ''')
     conn.commit()
@@ -92,20 +100,20 @@ def login(user_data: Dict[str, str]):
     conn.close()
     return {"message": "Login successful", "username": username}
 
-@app.get("/chat-history/{username}")
-def get_chat_history(username: str):
-    """Retrieve chat history for a specific user from SQLite."""
+@app.post("/start-conversation/{username}")
+def start_conversation(username: str):
+    """Create a new conversation for the user."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT user_message, ai_response, timestamp FROM chat_history WHERE username = ? ORDER BY id DESC LIMIT 50", (username,))
-    history = [
-        {"user": row[0], "ai": row[1], "timestamp": row[2]} for row in cursor.fetchall()
-    ]
+    timestamp = datetime.utcnow().isoformat()
+    cursor.execute("INSERT INTO conversations (username, created_at) VALUES (?, ?)", (username, timestamp))
+    conversation_id = cursor.lastrowid
+    conn.commit()
     conn.close()
-    return {"history": history}
+    return {"conversation_id": conversation_id}
 
-@app.post("/chat/{username}")
-async def chat_with_ai(username: str, user_input: dict):
+@app.post("/chat/{conversation_id}")
+async def chat_with_ai(conversation_id: int, user_input: dict):
     """Mock response while waiting for OpenAI quota reset, stored in SQLite."""
     prompt = user_input.get("prompt")
     if not prompt:
@@ -116,21 +124,33 @@ async def chat_with_ai(username: str, user_input: dict):
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO chat_history (username, user_message, ai_response, timestamp) VALUES (?, ?, ?, ?)", 
-                   (username, prompt, response_text, timestamp))
+    cursor.execute("INSERT INTO chat_history (conversation_id, user_message, ai_response, timestamp) VALUES (?, ?, ?, ?)", 
+                   (conversation_id, prompt, response_text, timestamp))
     conn.commit()
     conn.close()
     
     return {"response": response_text}
 
-@app.delete("/clear-chat-history/{username}")
-def clear_chat_history(username: str):
-    """Clear chat history for a specific user in SQLite."""
+@app.get("/chat-history/{conversation_id}")
+def get_chat_history(conversation_id: int):
+    """Retrieve chat history for a specific conversation from SQLite."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM chat_history WHERE username = ?", (username,))
+    cursor.execute("SELECT user_message, ai_response, timestamp FROM chat_history WHERE conversation_id = ? ORDER BY id ASC", (conversation_id,))
+    history = [
+        {"user": row[0], "ai": row[1], "timestamp": row[2]} for row in cursor.fetchall()
+    ]
+    conn.close()
+    return {"history": history}
+
+@app.delete("/clear-chat-history/{conversation_id}")
+def clear_chat_history(conversation_id: int):
+    """Clear chat history for a specific conversation in SQLite."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM chat_history WHERE conversation_id = ?", (conversation_id,))
     conn.commit()
     conn.close()
-    return {"message": f"Chat history cleared for {username}"}
+    return {"message": f"Chat history cleared for conversation {conversation_id}"}
 
 # Run server using: uvicorn main:app --reload
