@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Faithful Companion Chat</title>
     <script>
+        window.onload = function() {
+            loadConversationList(); // Automatically fetch past conversations
+        };
+
+
         let currentConversationId = null;
         let username = "John"; // Temporary username for testing
 
@@ -16,6 +21,7 @@
             currentConversationId = data.conversation_id;
             document.getElementById("conversationId").innerText = `Conversation ID: ${currentConversationId}`;
             loadConversations();
+            loadConversationList();
         }
 
         async function sendMessage() {
@@ -48,6 +54,7 @@
         }
 
         async function loadConversations() {
+            if (!currentConversationId) return;
             const response = await fetch(`http://127.0.0.1:8000/chat-history/${currentConversationId}`);
             const data = await response.json();
             const chatBox = document.getElementById("chatBox");
@@ -57,12 +64,43 @@
                 displayMessage("AI", entry.ai);
             });
         }
+
+        async function loadConversationList() {
+            const response = await fetch(`http://127.0.0.1:8000/user-conversations/${username}`);
+            const data = await response.json();
+            const dropdown = document.getElementById("conversationList");
+            dropdown.innerHTML = "";
+            data.conversations.forEach(convo => {
+                const option = document.createElement("option");
+                option.value = convo.id;
+                option.textContent = `Conversation ${convo.id} - ${convo.created_at}`;
+                dropdown.appendChild(option);
+            });
+        }
+
+        function selectConversation() {
+            const dropdown = document.getElementById("conversationList");
+            currentConversationId = dropdown.value;
+            document.getElementById("conversationId").innerText = `Conversation ID: ${currentConversationId}`;
+            loadConversations();
+        }
+
+        async function clearChatHistory() {
+            if (!currentConversationId) return;
+            await fetch(`http://127.0.0.1:8000/clear-chat-history/${currentConversationId}`, {
+                method: "DELETE"
+            });
+            document.getElementById("chatBox").innerHTML = "";
+        }
     </script>
 </head>
 <body>
     <h1>Faithful Companion Chat</h1>
     <button onclick="startConversation()">Start New Conversation</button>
     <p id="conversationId">No conversation started.</p>
+    <label for="conversationList">Select Conversation:</label>
+    <select id="conversationList" onchange="selectConversation()"></select>
+    <button onclick="clearChatHistory()">Clear Chat</button>
     <div id="chatBox" style="border:1px solid black; padding:10px; width:50%; height:300px; overflow:auto;"></div>
     <input type="text" id="messageInput" placeholder="Type your message...">
     <button onclick="sendMessage()">Send</button>

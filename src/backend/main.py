@@ -153,4 +153,14 @@ def clear_chat_history(conversation_id: int):
     conn.close()
     return {"message": f"Chat history cleared for conversation {conversation_id}"}
 
+@app.get("/user-conversations/{username}")
+def get_user_conversations(username: str):
+    """Retrieve all conversations for a given user."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, created_at FROM conversations WHERE username = ? ORDER BY created_at DESC", (username,))
+    conversations = [{"id": row[0], "created_at": row[1]} for row in cursor.fetchall()]
+    conn.close()
+    return {"conversations": conversations}
+
 # Run server using: uvicorn main:app --reload
