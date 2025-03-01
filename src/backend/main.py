@@ -1,5 +1,5 @@
 import os
-import json
+import sqlite3
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -26,46 +26,34 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     print("Warning: API key not found. Running in mock mode.")
 
-# Chat history storage
-USER_DATA_FOLDER = "user_data"
-MESSAGE_LIMIT = 50  # Store only the last 50 messages
-USER_CREDENTIALS_FILE = "user_data/user_credentials.json"
+# Database Setup
+DB_PATH = "faithful_companion.db"
 
-# Ensure user data folder exists
-os.makedirs(USER_DATA_FOLDER, exist_ok=True)
+def init_db():
+    """Initialize the database and create necessary tables."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            user_message TEXT NOT NULL,
+            ai_response TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY(username) REFERENCES users(username)
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-# Load user credentials
-if not os.path.exists(USER_CREDENTIALS_FILE):
-    with open(USER_CREDENTIALS_FILE, "w", encoding="utf-8") as file:
-        json.dump({}, file)
-
-def get_user_chat_file(username: str):
-    return os.path.join(USER_DATA_FOLDER, f"chat_history_{username}.json")
-
-def load_chat_history(username: str):
-    """Load chat history for a specific user."""
-    chat_file = get_user_chat_file(username)
-    if os.path.exists(chat_file):
-        with open(chat_file, "r", encoding="utf-8") as file:
-            return json.load(file)
-    return []
-
-def save_chat_history(username: str, history):
-    """Save chat history for a specific user."""
-    history = history[-MESSAGE_LIMIT:]  # Keep only the last MESSAGE_LIMIT messages
-    chat_file = get_user_chat_file(username)
-    with open(chat_file, "w", encoding="utf-8") as file:
-        json.dump(history, file, indent=4)
-
-def load_user_credentials():
-    """Load stored user credentials."""
-    with open(USER_CREDENTIALS_FILE, "r", encoding="utf-8") as file:
-        return json.load(file)
-
-def save_user_credentials(credentials):
-    """Save user credentials."""
-    with open(USER_CREDENTIALS_FILE, "w", encoding="utf-8") as file:
-        json.dump(credentials, file, indent=4)
+init_db()
 
 @app.get("/")
 def read_root():
@@ -78,53 +66,68 @@ def check_key():
 
 @app.post("/login")
 def login(user_data: Dict[str, str]):
-    """Basic username-password authentication (not secure yet)."""
+    """Basic username-password authentication with SQLite storage."""
     username = user_data.get("username")
     password = user_data.get("password")
     
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password are required")
     
-    credentials = load_user_credentials()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+    existing_user = cursor.fetchone()
     
-    if username in credentials:
-        if credentials[username] != password:
+    if existing_user:
+        if existing_user[0] != password:
+            conn.close()
             raise HTTPException(status_code=401, detail="Invalid password")
     else:
-        credentials[username] = password  # Save new user credentials
-        save_user_credentials(credentials)
+        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+        conn.commit()
     
+    conn.close()
     return {"message": "Login successful", "username": username}
 
 @app.get("/chat-history/{username}")
 def get_chat_history(username: str):
-    """Retrieve saved chat history for a specific user."""
-    return {"history": load_chat_history(username)}
+    """Retrieve chat history for a specific user from SQLite."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_message, ai_response, timestamp FROM chat_history WHERE username = ? ORDER BY id DESC LIMIT 50", (username,))
+    history = [
+        {"user": row[0], "ai": row[1], "timestamp": row[2]} for row in cursor.fetchall()
+    ]
+    conn.close()
+    return {"history": history}
 
 @app.post("/chat/{username}")
 async def chat_with_ai(username: str, user_input: dict):
-    """Mock response while waiting for OpenAI quota reset."""
+    """Mock response while waiting for OpenAI quota reset, stored in SQLite."""
     prompt = user_input.get("prompt")
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt is required")
-
-    response = {
-        "user": prompt,
-        "ai": f"Mock response for: {prompt}",
-        "timestamp": datetime.utcnow().isoformat()  # Add timestamp
-    }
-    history = load_chat_history(username)
-    history.append(response)
-    save_chat_history(username, history)
     
-    return {"response": response["ai"]}
+    response_text = f"Mock response for: {prompt}"
+    timestamp = datetime.utcnow().isoformat()
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO chat_history (username, user_message, ai_response, timestamp) VALUES (?, ?, ?, ?)", 
+                   (username, prompt, response_text, timestamp))
+    conn.commit()
+    conn.close()
+    
+    return {"response": response_text}
 
 @app.delete("/clear-chat-history/{username}")
 def clear_chat_history(username: str):
-    """Clear chat history for a specific user."""
-    chat_file = get_user_chat_file(username)
-    with open(chat_file, "w", encoding="utf-8") as file:
-        json.dump([], file, indent=4)
+    """Clear chat history for a specific user in SQLite."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM chat_history WHERE username = ?", (username,))
+    conn.commit()
+    conn.close()
     return {"message": f"Chat history cleared for {username}"}
 
 # Run server using: uvicorn main:app --reload
