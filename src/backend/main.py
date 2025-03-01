@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import bcrypt
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -66,9 +67,9 @@ def check_key():
 
 @app.post("/login")
 def login(user_data: Dict[str, str]):
-    """Basic username-password authentication with SQLite storage."""
+    """Username-password authentication with bcrypt password hashing."""
     username = user_data.get("username")
-    password = user_data.get("password")
+    password = user_data.get("password").encode('utf-8')
     
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password are required")
@@ -79,11 +80,13 @@ def login(user_data: Dict[str, str]):
     existing_user = cursor.fetchone()
     
     if existing_user:
-        if existing_user[0] != password:
+        stored_password = existing_user[0]
+        if not bcrypt.checkpw(password, stored_password.encode('utf-8')):
             conn.close()
             raise HTTPException(status_code=401, detail="Invalid password")
     else:
-        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+        hashed_password = bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8')
+        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
         conn.commit()
     
     conn.close()
