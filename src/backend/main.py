@@ -1,9 +1,10 @@
 import os
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from datetime import datetime
+from typing import Dict
 
 # Load environment variables
 load_dotenv()
@@ -25,21 +26,29 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     print("Warning: API key not found. Running in mock mode.")
 
-# Chat history file
-CHAT_HISTORY_FILE = "chat_history.json"
+# Chat history storage
+USER_DATA_FOLDER = "user_data"
 MESSAGE_LIMIT = 50  # Store only the last 50 messages
 
-def load_chat_history():
-    """Load chat history from file."""
-    if os.path.exists(CHAT_HISTORY_FILE):
-        with open(CHAT_HISTORY_FILE, "r", encoding="utf-8") as file:
+# Ensure user data folder exists
+os.makedirs(USER_DATA_FOLDER, exist_ok=True)
+
+def get_user_chat_file(username: str):
+    return os.path.join(USER_DATA_FOLDER, f"chat_history_{username}.json")
+
+def load_chat_history(username: str):
+    """Load chat history for a specific user."""
+    chat_file = get_user_chat_file(username)
+    if os.path.exists(chat_file):
+        with open(chat_file, "r", encoding="utf-8") as file:
             return json.load(file)
     return []
 
-def save_chat_history(history):
-    """Save chat history to file, keeping only the last MESSAGE_LIMIT messages."""
+def save_chat_history(username: str, history):
+    """Save chat history for a specific user."""
     history = history[-MESSAGE_LIMIT:]  # Keep only the last MESSAGE_LIMIT messages
-    with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as file:
+    chat_file = get_user_chat_file(username)
+    with open(chat_file, "w", encoding="utf-8") as file:
         json.dump(history, file, indent=4)
 
 @app.get("/")
@@ -51,13 +60,21 @@ def check_key():
     """Check if API key is correctly set."""
     return {"API Key Found": OPENAI_API_KEY is not None}
 
-@app.get("/chat-history")
-def get_chat_history():
-    """Retrieve saved chat history."""
-    return {"history": load_chat_history()}
+@app.post("/login")
+def login(user_data: Dict[str, str]):
+    """Basic username-based authentication (no passwords yet)."""
+    username = user_data.get("username")
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+    return {"message": "Login successful", "username": username}
 
-@app.post("/chat")
-async def chat_with_ai(user_input: dict):
+@app.get("/chat-history/{username}")
+def get_chat_history(username: str):
+    """Retrieve saved chat history for a specific user."""
+    return {"history": load_chat_history(username)}
+
+@app.post("/chat/{username}")
+async def chat_with_ai(username: str, user_input: dict):
     """Mock response while waiting for OpenAI quota reset."""
     prompt = user_input.get("prompt")
     if not prompt:
@@ -68,17 +85,18 @@ async def chat_with_ai(user_input: dict):
         "ai": f"Mock response for: {prompt}",
         "timestamp": datetime.utcnow().isoformat()  # Add timestamp
     }
-    history = load_chat_history()
+    history = load_chat_history(username)
     history.append(response)
-    save_chat_history(history)
+    save_chat_history(username, history)
     
     return {"response": response["ai"]}
 
-@app.delete("/clear-chat-history")
-def clear_chat_history():
-    """Clear chat history file."""
-    with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as file:
+@app.delete("/clear-chat-history/{username}")
+def clear_chat_history(username: str):
+    """Clear chat history for a specific user."""
+    chat_file = get_user_chat_file(username)
+    with open(chat_file, "w", encoding="utf-8") as file:
         json.dump([], file, indent=4)
-    return {"message": "Chat history cleared."}
+    return {"message": f"Chat history cleared for {username}"}
 
 # Run server using: uvicorn main:app --reload
