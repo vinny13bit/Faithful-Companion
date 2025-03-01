@@ -29,9 +29,15 @@ if not OPENAI_API_KEY:
 # Chat history storage
 USER_DATA_FOLDER = "user_data"
 MESSAGE_LIMIT = 50  # Store only the last 50 messages
+USER_CREDENTIALS_FILE = "user_data/user_credentials.json"
 
 # Ensure user data folder exists
 os.makedirs(USER_DATA_FOLDER, exist_ok=True)
+
+# Load user credentials
+if not os.path.exists(USER_CREDENTIALS_FILE):
+    with open(USER_CREDENTIALS_FILE, "w", encoding="utf-8") as file:
+        json.dump({}, file)
 
 def get_user_chat_file(username: str):
     return os.path.join(USER_DATA_FOLDER, f"chat_history_{username}.json")
@@ -51,6 +57,16 @@ def save_chat_history(username: str, history):
     with open(chat_file, "w", encoding="utf-8") as file:
         json.dump(history, file, indent=4)
 
+def load_user_credentials():
+    """Load stored user credentials."""
+    with open(USER_CREDENTIALS_FILE, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+def save_user_credentials(credentials):
+    """Save user credentials."""
+    with open(USER_CREDENTIALS_FILE, "w", encoding="utf-8") as file:
+        json.dump(credentials, file, indent=4)
+
 @app.get("/")
 def read_root():
     return {"message": "Faithful Companion API is running"}
@@ -62,10 +78,22 @@ def check_key():
 
 @app.post("/login")
 def login(user_data: Dict[str, str]):
-    """Basic username-based authentication (no passwords yet)."""
+    """Basic username-password authentication (not secure yet)."""
     username = user_data.get("username")
-    if not username:
-        raise HTTPException(status_code=400, detail="Username is required")
+    password = user_data.get("password")
+    
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+    
+    credentials = load_user_credentials()
+    
+    if username in credentials:
+        if credentials[username] != password:
+            raise HTTPException(status_code=401, detail="Invalid password")
+    else:
+        credentials[username] = password  # Save new user credentials
+        save_user_credentials(credentials)
+    
     return {"message": "Login successful", "username": username}
 
 @app.get("/chat-history/{username}")
