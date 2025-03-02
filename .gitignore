@@ -1,1 +1,4 @@
 faithful_companion.db
+
+# Ignore environment variables
+.env

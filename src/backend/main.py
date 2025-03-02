@@ -8,7 +8,10 @@ from datetime import datetime
 from typing import Dict
 
 # Load environment variables
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv()
+
+print("Loaded .env from:", dotenv_path)
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -26,6 +29,8 @@ app.add_middleware(
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     print("Warning: API key not found. Running in mock mode.")
+else:
+    print("API key detected:", OPENAI_API_KEY[:5] + "****")
 
 # Database Setup
 DB_PATH = "faithful_companion.db"
